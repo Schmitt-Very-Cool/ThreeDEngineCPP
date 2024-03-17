@@ -14,8 +14,17 @@
 
 #include "Shader.h"
 
+#include "../io/Keyboard.h"
+#include "../io/Mouse.h"
+#include "../io/Joystick.h"
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
+
+float mixVal = 0.5f;
+
+glm::mat4 transform = glm::mat4(1.0f);
+Joystick mainJ(0);
 
 int main() {
 	int success;
@@ -53,6 +62,12 @@ int main() {
 
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+	glfwSetKeyCallback(window, Keyboard::keyCallback);
+
+	glfwSetCursorPosCallback(window, Mouse::cursorPosCallback);
+	glfwSetMouseButtonCallback(window, Mouse::mouseButtonCallback);
+	glfwSetScrollCallback(window, Mouse::mouseWheelCallback);
+
 	// SHADERS===================================
 	Shader shader("assets/vertex_core.glsl", "assets/fragment_core.glsl");
 
@@ -69,7 +84,7 @@ int main() {
 		3, 1, 2		//second triangle
 	};
 
-	// VAO, VBO
+	// VAO, VBO, EBO
 	unsigned int VAO, VBO, EBO;
 	glGenBuffers(1, &VBO);
 	glGenVertexArrays(1, &VAO);
@@ -87,26 +102,29 @@ int main() {
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	//set attribute pointers
-	//positions
+	//position
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	//color
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-	//texture coordinates
+	//texture coordinate attribute
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
 
-	// TEXTURES
+	// TEXTURES -------------------------------------------
 
+	//generate texture
 	unsigned int texture1, texture2;
 
 	glGenTextures(1, &texture1);
 	glBindTexture(GL_TEXTURE_2D, texture1); //bind to texture unit 0
 
+	// image wrap (s, t, r) = (x, y, z)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
+	// image filtering
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
@@ -128,9 +146,11 @@ int main() {
 	glGenTextures(1, &texture2);
 	glBindTexture(GL_TEXTURE_2D, texture2);
 
+	// load image 2
 	data = stbi_load("assets/image2.png", &width, &height, &nChannels, 0);
 
 	if (data) {
+		//RGBA because png
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
@@ -141,10 +161,19 @@ int main() {
 	shader.setInt("texture1", 0);
 	shader.setInt("texture2", 1);
 
-	glm::mat4 trans = glm::mat4(1.0f);
+	//transformations
+	/*glm::mat4 trans = glm::mat4(1.0f);
 	trans = glm::rotate(trans, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	shader.activate();
-	shader.setMat4("transform", trans);
+	shader.setMat4("transform", trans);*/
+
+	mainJ.update();
+	if (mainJ.isPresent()) {
+		std::cout << mainJ.getName() << " is present." << std::endl;
+	}
+	else {
+		std::cout << "Not present." << std::endl;
+	}
 
 	//MAIN LOOP --------------------------------------------------------------------------
 	while (!glfwWindowShouldClose(window)) {
@@ -152,7 +181,7 @@ int main() {
 		processInput(window);
 
 		//Render
-		glClearColor(0.2f, 0.7f, 0.3f, 1.0f);
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glActiveTexture(GL_TEXTURE0);
@@ -163,11 +192,14 @@ int main() {
 		//draw shapes
 		glBindVertexArray(VAO);
 		shader.activate();
+		shader.setMat4("transform", transform);
 
 		float timeValue = glfwGetTime();
 
-		trans = glm::rotate(trans, glm::radians(timeValue / 100), glm::vec3(0.0f, 0.5f, 0.5f));
-		shader.setMat4("transform", trans);
+		//trans = glm::rotate(trans, glm::radians(timeValue / 100), glm::vec3(0.0f, 0.5f, 0.5f));
+		//shader.setMat4("transform", trans);
+
+		shader.setFloat("mixVal", mixVal);
 
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -192,7 +224,56 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 }
 
 void processInput(GLFWwindow* window) {
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+	if (Keyboard::key(GLFW_KEY_ESCAPE) || mainJ.buttonState(GLFW_JOYSTICK_BTN_RIGHT)) {
 		glfwSetWindowShouldClose(window, true);
+	}
+
+	//change mix value
+	if (Keyboard::key(GLFW_KEY_UP)) {
+		mixVal += 0.001f;
+		if (mixVal > 1) {
+			mixVal = 1.0f;
+		}
+	}
+	if (Keyboard::key(GLFW_KEY_DOWN)) {
+		mixVal -= 0.001f;
+		if (mixVal < 0) {
+			mixVal = 0.0f;
+		}
+	}
+
+	if (Keyboard::key(GLFW_KEY_W)) {
+		transform = glm::translate(transform, glm::vec3(0.0f, 0.01f, 0.0f));
+	}
+	if (Keyboard::key(GLFW_KEY_S)) {
+		transform = glm::translate(transform, glm::vec3(0.0f, -0.01f, 0.0f));
+	}
+	if (Keyboard::key(GLFW_KEY_A)) {
+		transform = glm::translate(transform, glm::vec3(-0.01f, 0.0f, 0.0f));
+	}
+	if (Keyboard::key(GLFW_KEY_D)) {
+		transform = glm::translate(transform, glm::vec3(0.01f, 0.0f, 0.0f));
+	}
+
+	mainJ.update();
+
+	float lx = mainJ.axesState(GLFW_JOYSTICK_AXES_LEFT_STICK_X);
+	float ly = -mainJ.axesState(GLFW_JOYSTICK_AXES_LEFT_STICK_Y);
+
+	if (std::abs(lx) > 0.5f) {
+		transform = glm::translate(transform, glm::vec3(lx / 10, 0.0f, 0.0f));
+	}
+	if (std::abs(ly) > 0.5f) {
+		transform = glm::translate(transform, glm::vec3(0.0f, ly / 10, 0.0f));
+	}
+
+	float rt = mainJ.isPresent() ? mainJ.axesState(GLFW_JOYSTICK_AXES_RIGHT_TRIGGER) / 2 + 0.5f : 0;
+	if (rt > 0.05f) {
+		transform = glm::scale(transform, glm::vec3(1 + rt / 10, 1 + rt / 10, 0.0f));
+	}
+
+	float lt = mainJ.isPresent() ? mainJ.axesState(GLFW_JOYSTICK_AXES_LEFT_TRIGGER) / 2 + 0.5f : 0;
+	if (lt > 0.05f) {
+		transform = glm::scale(transform, glm::vec3(1 - lt / 10, 1 - lt / 10, 0.0f));
 	}
 }

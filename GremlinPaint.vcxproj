@@ -109,6 +109,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +135,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="io\Joystick.cpp" />
+    <ClCompile Include="io\keyboard.cpp" />
+    <ClCompile Include="io\Mouse.cpp" />
     <ClCompile Include="lib\glad.c" />
     <ClCompile Include="lib\stb.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -144,6 +149,9 @@
     <None Include="assets\vertex_core.glsl" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="io\Joystick.h" />
+    <ClInclude Include="io\Keyboard.h" />
+    <ClInclude Include="io\Mouse.h" />
     <ClInclude Include="src\Shader.h" />
   </ItemGroup>
   <ItemGroup>
